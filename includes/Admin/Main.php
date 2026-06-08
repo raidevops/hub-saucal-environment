@@ -21,7 +21,8 @@ final class Main {
 	 */
 	public static function hooks() {
 
-		Assets::hooks();
+		// The Saucal Hub admin page registers + enqueues its own (scoped) assets.
+		Page::hooks();
 
 		add_action( 'current_screen', array( self::class, 'conditional_includes' ) );
 	}

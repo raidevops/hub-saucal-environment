@@ -10,7 +10,7 @@
  * @wordpress-plugin
  * Plugin Name: Saucal Hub
  * Plugin URI:  https://saucal.com/
- * Description: This is a short description of what the plugin does. It's displayed in the WordPress admin area.
+ * Description: Manage local/staging clones and make them safe to test on — disable auto-charges, sandbox gateways, neutralise saved cards, and guard outgoing email. React + PrimeReact admin.
  * Version:     1.0.0
  * Author:      SAU/CAL
  * Author URI:  https://saucal.com/

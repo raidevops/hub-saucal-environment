@@ -32,6 +32,10 @@
 		"lint:js:fix": "wp-scripts lint-js ./src --fix",
 		"lint:php": "composer run-script phpcs ./"
 	},
+	"dependencies": {
+		"primeicons": "^7.0.0",
+		"primereact": "^10.9.6"
+	},
 	"devDependencies": {
 		"@wordpress/scripts": "^30.27.0",
 		"glob": "^10.3.0",

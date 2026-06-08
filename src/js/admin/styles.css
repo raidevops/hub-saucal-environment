@@ -1,0 +1,245 @@
+/* Saucal Hub admin app layout. Bundled into the admin stylesheet via JS import. */
+
+.saucal-hub-wrap {
+	margin-right: 20px;
+}
+
+.sh-app {
+	max-width: 1200px;
+}
+
+.sh-center {
+	display: flex;
+	justify-content: center;
+	padding: 4rem 0;
+}
+
+.sh-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+	margin: 1rem 0 0.5rem;
+}
+
+.sh-title {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.sh-title h1 {
+	margin: 0;
+	font-size: 1.6rem;
+}
+
+.sh-title .pi {
+	font-size: 1.6rem;
+	color: var( --primary-color, #0891b2 );
+}
+
+.sh-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.sh-site-meta {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
+	margin-bottom: 1rem;
+}
+
+.sh-summary {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	padding: 0.75rem 0 1rem;
+}
+
+.sh-summary .sh-spacer {
+	flex: 1;
+}
+
+.sh-columns {
+	display: grid;
+	grid-template-columns: 1fr 380px;
+	gap: 1.25rem;
+	align-items: start;
+}
+
+@media ( max-width: 1100px ) {
+	.sh-columns {
+		grid-template-columns: 1fr;
+	}
+}
+
+.sh-group {
+	margin-bottom: 1.25rem;
+}
+
+.sh-check-row {
+	display: grid;
+	grid-template-columns: 90px 1fr auto;
+	gap: 0.75rem;
+	align-items: start;
+	padding: 0.75rem 0;
+	border-top: 1px solid #f0f0f1;
+}
+
+.sh-group .p-card-content > .sh-check-row:first-child {
+	border-top: none;
+}
+
+.sh-check-message {
+	color: #50575e;
+	margin-top: 0.15rem;
+}
+
+.sh-check-desc {
+	color: #787c82;
+	font-size: 0.82rem;
+	margin-top: 0.35rem;
+}
+
+.sh-remediation {
+	display: inline-block;
+	margin-top: 0.4rem;
+	padding: 0.15rem 0.4rem;
+	background: #1d2327;
+	color: #fff;
+	border-radius: 3px;
+	font-size: 0.8rem;
+}
+
+.sh-check-action {
+	min-width: 70px;
+	text-align: right;
+}
+
+.sh-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.sh-form label {
+	font-weight: 600;
+	margin-top: 0.5rem;
+}
+
+.sh-form-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+	margin-top: 1rem;
+}
+
+.sh-inline {
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	margin: 0.5rem 0;
+}
+
+.sh-label-top {
+	display: block;
+	font-weight: 600;
+	margin-top: 0.75rem;
+}
+
+.sh-muted {
+	color: #787c82;
+	font-size: 0.85rem;
+}
+
+.sh-linkbtn {
+	background: none;
+	border: 0;
+	padding: 0;
+	margin-top: 0.4rem;
+	color: var( --primary-color, #0891b2 );
+	cursor: pointer;
+	font-size: 0.82rem;
+}
+
+.sh-json {
+	background: #1d2327;
+	color: #c3e88d;
+	padding: 0.5rem 0.6rem;
+	border-radius: 4px;
+	font-size: 0.78rem;
+	line-height: 1.4;
+	overflow: auto;
+	max-height: 240px;
+	margin: 0.35rem 0 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.sh-commands .sh-cmd,
+code.sh-cmd {
+	display: inline-block;
+	background: #1d2327;
+	color: #fff;
+	padding: 0.2rem 0.45rem;
+	border-radius: 3px;
+	font-size: 0.8rem;
+	word-break: break-all;
+}
+
+.sh-activity {
+	border: 1px solid #e2e4e7;
+	border-radius: 6px;
+	padding: 0.6rem 0.75rem;
+	margin-bottom: 0.6rem;
+}
+
+.sh-activity-head {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.sh-beforeafter {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.5rem;
+	margin-top: 0.4rem;
+}
+
+@media ( max-width: 700px ) {
+	.sh-beforeafter {
+		grid-template-columns: 1fr;
+	}
+}
+
+.sh-tagmini {
+	display: inline-block;
+	font-size: 0.7rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	padding: 0.05rem 0.4rem;
+	border-radius: 3px;
+}
+
+.sh-tagmini.sh-before {
+	background: #fde2e1;
+	color: #7a271a;
+}
+
+.sh-tagmini.sh-after {
+	background: #d7f5dd;
+	color: #14532d;
+}
+
+.sh-changed summary {
+	cursor: pointer;
+	color: var( --primary-color, #0891b2 );
+	font-size: 0.82rem;
+	margin-top: 0.4rem;
+}

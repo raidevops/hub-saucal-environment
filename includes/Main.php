@@ -23,7 +23,8 @@ final class Main {
 	const PLUGIN_REQUIREMENTS = array(
 		'php_version' => '8.1',
 		'wp_version'  => '5.6',
-		'wc_version'  => '5.3',
+		// WooCommerce is NOT required: Saucal Hub is a management tool. Sites
+		// without WooCommerce simply report the Woo-specific checks as N/A.
 	);
 
 
@@ -84,6 +85,15 @@ final class Main {
 		Rewrites::hooks();
 
 		Customizations\ACF::hooks();
+
+		// Saucal Hub: REST API + runtime safety guards. Loaded on every request
+		// (not just admin) so the outgoing email guard and the REST endpoints
+		// the React app calls are always available.
+		Rest\Controller::hooks();
+		Safety\EmailGuard::hooks();
+
+		// WP-CLI commands (no-op when WP-CLI is not present).
+		CLI::register();
 
 		// Set up localisation.
 		self::load_plugin_textdomain();
