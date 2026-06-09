@@ -6,6 +6,38 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Added — Performance / stability
+- **WP-Cron option thrash detection** (`Safety\CronWatch` + `cron_option_thrash`
+  check): a runtime monitor attributes every write to the single `cron`
+  `wp_options` row to the nearest non-core class + plugin/mu-plugin/theme via a
+  backtrace. When a caller rewrites that row repeatedly (e.g. a hook that
+  (un)schedules events on every request), the offender — class, file:line,
+  affected cron hooks, plugin name/version and any available update — is recorded
+  to a site option and surfaced by:
+  - the `cron_option_thrash` safety check (works locally and over the shared DB
+    for remote sites), and
+  - an `admin_notices` alert naming the class + plugin and suggesting an update or
+    removal.
+  Self-bounding: healthy sites (0–1 cron writes/request) never trip it and it
+  never writes to the DB; on a thrashing site it persists at most once per minute
+  per offender. Threshold filterable via `saucal_hub_cron_watch_threshold`.
+- **`wp saucal-hub cron-forensics`** — active, in-context detection for when the
+  passive monitor has nothing yet (e.g. scanning a site from the hub before any
+  traffic). It reports what was captured *naturally* during the wp-cli bootstrap
+  (the listeners attach before `init` — via the plugin, or via `cli-bootstrap.php`
+  on sites that don't have it active), so a single run reproduces and attributes
+  the thrash. `--report` persists the findings so the hub UI/notice show them.
+  `--replay` (clone-only, `--force` to override) additionally re-fires init/wp_loaded.
+  Uses a **two-pass** check (a fresh second process) so legitimate one-time
+  scheduling — a plugin scheduling its recurring events because they were missing —
+  is excluded; only callers that rewrite the cron row on *every* request are
+  reported. `--report` writes an authoritative snapshot, so once the offending code
+  is fixed a re-run flips the check back to SAFE immediately (no 24h wait).
+
+### Changed — Admin UX
+- The selected site is now reflected in the URL (`?page=saucal-hub&site=<id>`),
+  so site views are bookmarkable and browser back/forward switches sites.
+
 ### Added — Auditing / logging
 - **Granular per-row detail** in scans and logs (capped at 100 rows/check):
   - `transaction_meta`: order/subscription ID, post type, meta key, stored value

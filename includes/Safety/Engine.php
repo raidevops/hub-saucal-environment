@@ -41,6 +41,7 @@ final class Engine {
 		return array(
 			Checks\EnvironmentType::class,
 			Checks\DisableCron::class,
+			Checks\CronOptionThrash::class,
 			Checks\SubscriptionsAutomaticPayments::class,
 			Checks\PaymentGatewaysTestMode::class,
 			Checks\ScheduledSubscriptionPayments::class,

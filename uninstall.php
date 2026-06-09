@@ -10,3 +10,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 }
 
 // PERFORM UNINSTALL ACTIONS HERE.
+
+// Runtime WP-Cron thrash findings + forensic scratch (see Safety\CronWatch).
+delete_option( 'saucal_hub_cron_watch' );
+delete_option( 'saucal_hub_cron_watch_probe' );

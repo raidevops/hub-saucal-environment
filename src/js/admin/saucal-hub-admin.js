@@ -32,6 +32,25 @@ import './styles.css';
 const DATA = window.SaucalHubData || {};
 
 /* -------------------------------------------------------------------------
+ * Selected-site <-> URL sync (so the chosen site is reflected/bookmarkable)
+ * ---------------------------------------------------------------------- */
+function getSiteFromUrl() {
+	const params = new URLSearchParams( window.location.search );
+	return params.get( 'site' ) || 'self';
+}
+
+function setSiteInUrl( id, push ) {
+	const url = new URL( window.location.href );
+	if ( id && id !== 'self' ) {
+		url.searchParams.set( 'site', id );
+	} else {
+		url.searchParams.delete( 'site' );
+	}
+	const method = push ? 'pushState' : 'replaceState';
+	window.history[ method ]( {}, '', url );
+}
+
+/* -------------------------------------------------------------------------
  * REST helper
  * ---------------------------------------------------------------------- */
 async function api( path, { method = 'GET', body } = {} ) {
@@ -492,7 +511,7 @@ function ActivityDialog( { visible, onHide, toast } ) {
 function App() {
 	const toast = useRef( null );
 	const [ sites, setSites ] = useState( [] );
-	const [ siteId, setSiteId ] = useState( 'self' );
+	const [ siteId, setSiteId ] = useState( getSiteFromUrl );
 	const [ scan, setScan ] = useState( null );
 	const [ commands, setCommands ] = useState( null );
 	const [ guard, setGuard ] = useState( null );
@@ -557,6 +576,18 @@ function App() {
 		runScan();
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [ siteId ] );
+
+	// Keep the selected site in the URL, and react to browser back/forward.
+	const changeSite = useCallback( ( id ) => {
+		setSiteId( id );
+		setSiteInUrl( id, true );
+	}, [] );
+
+	useEffect( () => {
+		const onPop = () => setSiteId( getSiteFromUrl() );
+		window.addEventListener( 'popstate', onPop );
+		return () => window.removeEventListener( 'popstate', onPop );
+	}, [] );
 
 	const fixOne = async ( id ) => {
 		setFixing( id );
@@ -628,7 +659,7 @@ function App() {
 				<div className="sh-header-actions">
 					<Dropdown
 						value={ siteId }
-						onChange={ ( e ) => setSiteId( e.value ) }
+						onChange={ ( e ) => changeSite( e.value ) }
 						options={ sites.map( ( s ) => ( {
 							label: ( s.url || s.host || s.label ) + ( s.is_self ? ' ' + __( '(this site)', 'saucal-hub' ) : '' ),
 							value: s.id,

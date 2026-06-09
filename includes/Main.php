@@ -92,6 +92,11 @@ final class Main {
 		Rest\Controller::hooks();
 		Safety\EmailGuard::hooks();
 
+		// Runtime monitor: detect a plugin/class thrashing the WP-Cron option
+		// (single-row write hotspot → lock pile-up). Attributes writes on every
+		// request; persists only when a caller actually misbehaves.
+		Safety\CronWatch::hooks();
+
 		// WP-CLI commands (no-op when WP-CLI is not present).
 		CLI::register();
 

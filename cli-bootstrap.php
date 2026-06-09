@@ -41,3 +41,17 @@ spl_autoload_register(
 require_once __DIR__ . '/includes/CLI.php';
 
 \SaucalHub\CLI::register();
+
+// Attach the WP-Cron thrash listeners BEFORE WordPress fires `init`, even on a
+// target where the plugin is not active (so its Main::load never runs). This is
+// what lets `saucal-hub cron-forensics` capture per-request (un)scheduling
+// naturally during this process's own bootstrap — no hook re-firing required.
+\WP_CLI::add_wp_hook(
+	'muplugins_loaded',
+	function () {
+		if ( class_exists( '\\SaucalHub\\Safety\\CronWatch' ) ) {
+			\SaucalHub\Safety\CronWatch::hooks();
+		}
+	},
+	~PHP_INT_MAX
+);

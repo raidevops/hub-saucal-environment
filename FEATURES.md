@@ -47,6 +47,8 @@ features land.
 - [x] Transaction/charge/intent meta stripped — HPOS-aware (fixable)
 - [x] Outgoing email guard — restrict to allowed domains (fixable)
 - [x] Customer email obfuscation outside allow-list (fixable)
+- [x] WP-Cron option thrash detection — names the class + plugin hammering the `cron`
+      row (runtime monitor + admin alert; works locally and over the shared DB) — manual remediation
 
 ### Payments / email safety
 - [x] Outgoing email guard runtime (`wp_mail` interception, block/redirect)

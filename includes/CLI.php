@@ -21,7 +21,9 @@
 
 namespace SaucalHub;
 
+use SaucalHub\Safety\CronWatch;
 use SaucalHub\Safety\Engine;
+use SaucalHub\Safety\ProductionGuard;
 
 // Allow loading under WP-CLI via --require (which runs before ABSPATH is set);
 // still block direct web access.
@@ -48,6 +50,160 @@ final class CLI {
 		\WP_CLI::add_command( 'saucal-hub scan', array( self::class, 'scan' ) );
 		\WP_CLI::add_command( 'saucal-hub make-safe', array( self::class, 'make_safe' ) );
 		\WP_CLI::add_command( 'saucal-hub fix', array( self::class, 'fix' ) );
+		\WP_CLI::add_command( 'saucal-hub cron-forensics', array( self::class, 'cron_forensics' ) );
+	}
+
+	/**
+	 * Forensically detect a plugin/class thrashing the WP-Cron option, in-context.
+	 *
+	 * The passive monitor only records cron writes as real traffic hits a site
+	 * where the plugin is active. This command runs in the TARGET site's own
+	 * bootstrapped context and, by default, reports what was captured NATURALLY
+	 * while WordPress booted this process — the cron listeners attach before
+	 * `init` (via the plugin, or via cli-bootstrap.php on sites that don't have it
+	 * active), so any code that (un)schedules events on a per-request hook is
+	 * already recorded and attributed to a class + plugin. Safe: nothing is
+	 * re-executed.
+	 *
+	 * --replay additionally re-fires init/wp_loaded to force detection on an idle
+	 * load; that re-runs hook callbacks and can fatal if one isn't re-entrant, so
+	 * it is gated to clone hosts (use --force to override — never on production).
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--replay]
+	 * : Also re-fire per-request hooks to force/repeat detection (unsafe; clone-only).
+	 *
+	 * [--iterations=<n>]
+	 * : Replay iterations (only with --replay). Default 1.
+	 *
+	 * [--force]
+	 * : Allow --replay on a host that does not look like a clone.
+	 *
+	 * [--report]
+	 * : Persist findings to the saucal_hub_cron_watch option so the hub UI and the
+	 *   admin notice surface them.
+	 *
+	 * [--format=<format>]
+	 * : "human" (default) or "json".
+	 *
+	 * [--single]
+	 * : Internal — run a single natural-capture pass and stash it for the parent
+	 *   process's confirmation step. Not meant to be called directly.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   # On a site that has Saucal Hub active:
+	 *   wp saucal-hub cron-forensics --report
+	 *
+	 *   # On any other local site (plugin not required), from the docker-env root:
+	 *   wp --path=/var/www/talkboxmom/ngrok \
+	 *      --require=/var/www/hubmanager/public/wp-content/plugins/saucal-hub/cli-bootstrap.php \
+	 *      saucal-hub cron-forensics --report
+	 *
+	 * @param array $args       Positional args.
+	 * @param array $assoc_args Flags.
+	 *
+	 * @return void
+	 */
+	public static function cron_forensics( $args, $assoc_args ): void {
+
+		// Internal: a single natural-capture pass that writes its findings to the
+		// scratch option for the parent process to read. Used as the second pass
+		// (see below) — not meant to be called directly.
+		if ( ! empty( $assoc_args['single'] ) ) {
+			update_option( CronWatch::PROBE_OPTION, CronWatch::forensic_probe( 1, false ), false );
+			return;
+		}
+
+		$iterations = max( 1, (int) ( $assoc_args['iterations'] ?? 1 ) );
+		$replay     = ! empty( $assoc_args['replay'] );
+		$format     = $assoc_args['format'] ?? 'human';
+
+		if ( $replay && ! ProductionGuard::is_safe_host() && empty( $assoc_args['force'] ) ) {
+			$replay = false;
+			\WP_CLI::warning( 'Host does not look like a clone — ignoring --replay (pass --force to override). Reporting naturally-captured findings only.' );
+		}
+
+		// Pass 1: this process's own bootstrap. This also SCHEDULES any cron events
+		// that were missing, so legitimate one-time schedulers fire here.
+		$pass1 = CronWatch::forensic_probe( $iterations, $replay );
+
+		// Pass 2: a fresh sub-process. The events scheduled in pass 1 now exist, so
+		// one-time schedulers stay quiet and drop out — only code that rewrites the
+		// cron row on EVERY request (the actual thrash) shows up in both passes.
+		$offenders = $pass1;
+		$pass2     = self::second_pass();
+		if ( null === $pass2 ) {
+			\WP_CLI::warning( 'Could not run the confirmation pass — results may include one-time scheduling (e.g. a plugin scheduling its recurring events for the first time).' );
+		} else {
+			$offenders = array_intersect_key( $pass1, $pass2 );
+			$dropped   = count( $pass1 ) - count( $offenders );
+			if ( $dropped > 0 ) {
+				\WP_CLI::log( sprintf( '%d one-time scheduler(s) seen in the first pass were not persistent and were excluded.', $dropped ) );
+			}
+		}
+
+		if ( ! empty( $assoc_args['report'] ) ) {
+			CronWatch::store_findings( $offenders );
+		}
+
+		if ( 'json' === $format ) {
+			\WP_CLI::print_value( array_values( $offenders ), array( 'format' => 'json' ) );
+			return;
+		}
+
+		if ( empty( $offenders ) ) {
+			\WP_CLI::success( 'No plugin is repeatedly rewriting the WP-Cron option.' );
+			return;
+		}
+
+		$rows = array();
+		foreach ( $offenders as $offender ) {
+			$rows[] = array(
+				'level'    => strtoupper( $offender['level'] ),
+				'plugin'   => $offender['plugin_name'] ?? ( $offender['slug'] ?? '' ),
+				'class'    => '' !== ( $offender['class'] ?? '' ) ? $offender['class'] : ( $offender['function'] ?? '' ),
+				'writes'   => ( $offender['max_per_req'] ?? 0 ) . '/req',
+				'location' => ( $offender['file'] ?? '' ) . ( ! empty( $offender['line'] ) ? ':' . $offender['line'] : '' ),
+				'hooks'    => implode( ', ', array_slice( (array) ( $offender['hooks'] ?? array() ), 0, 5 ) ),
+			);
+		}
+		\WP_CLI\Utils\format_items( 'table', $rows, array( 'level', 'plugin', 'class', 'writes', 'location', 'hooks' ) );
+		\WP_CLI::warning( sprintf( '%d persistent cron-option offender(s) detected.', count( $offenders ) ) );
+	}
+
+	/**
+	 * Run the forensic second pass in a fresh sub-process and return its offenders
+	 * keyed by signature, or null if the sub-process could not be launched (so the
+	 * caller can fall back to single-pass with a warning).
+	 *
+	 * The child writes to CronWatch::PROBE_OPTION; we read it back from the DB
+	 * (busting the option cache first, since the child wrote it in another process).
+	 *
+	 * @return array<string,array>|null
+	 */
+	private static function second_pass(): ?array {
+		delete_option( CronWatch::PROBE_OPTION );
+
+		try {
+			\WP_CLI::runcommand(
+				'saucal-hub cron-forensics --single',
+				array(
+					'launch'     => true,
+					'exit_error' => false,
+					'return'     => 'all',
+				)
+			);
+		} catch ( \Throwable $e ) {
+			return null;
+		}
+
+		wp_cache_delete( CronWatch::PROBE_OPTION, 'options' );
+		$probe = get_option( CronWatch::PROBE_OPTION, null );
+		delete_option( CronWatch::PROBE_OPTION );
+
+		return is_array( $probe ) ? $probe : null;
 	}
 
 	/**
@@ -174,8 +330,8 @@ final class CLI {
 		$rows = array();
 		foreach ( $scan['checks'] as $c ) {
 			$rows[] = array(
-				'status' => strtoupper( $c['result']['status'] ),
-				'check'  => $c['id'],
+				'status'  => strtoupper( $c['result']['status'] ),
+				'check'   => $c['id'],
 				'message' => $c['result']['message'],
 			);
 		}
