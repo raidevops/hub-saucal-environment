@@ -121,20 +121,66 @@ connects as root), the hub reads/writes any site's data directly:
   bootstrap:
 
   ```bash
-  # one site
+  # full scan (forensics + safety scan + report) — recommended
+  bin/saucal-hub.sh full-scan /var/www/talkboxmom/ngrok
+  # individual actions
   bin/saucal-hub.sh scan /var/www/talkboxmom/ngrok
+  bin/saucal-hub.sh cron-forensics /var/www/talkboxmom/ngrok
   bin/saucal-hub.sh make-safe /var/www/talkboxmom/ngrok
   # every registered site
-  bin/saucal-hub.sh scan --all
+  bin/saucal-hub.sh full-scan --all
   ```
 
   This runs `wp --path=<site> --require=<plugin>/cli-bootstrap.php saucal-hub
   <action> --report`, storing the result in the target's `saucal_hub_last_report`
-  option, which the hub reads back over the shared DB.
+  option (and forensic findings in `saucal_hub_cron_watch`), which the hub reads
+  back over the shared DB.
 
 > Why CLI can't be triggered from the UI button: the plugin runs under PHP-FPM,
 > which can't `docker exec` into the `nodephp` (wp-cli) container. Run the
 > orchestrator from the host. (A host-side runner is a planned enhancement.)
+
+## Commands (CLI)
+
+Everything runs **synchronously** in the target site's own wp-cli process —
+nothing is deferred to WP-Cron / Action Scheduler.
+
+### Orchestrator (from the docker-env root) — recommended
+
+`bin/saucal-hub.sh` wraps the wp-cli invocation (and the `--require` bootstrap) so
+it works on any local site, even one without the plugin active:
+
+```bash
+bin/saucal-hub.sh full-scan      <container-path>   # forensics + safety scan + report
+bin/saucal-hub.sh scan           <container-path>   # safety scan only
+bin/saucal-hub.sh cron-forensics <container-path>   # WP-Cron thrash detection only
+bin/saucal-hub.sh make-safe      <container-path>   # apply all fixes (guarded)
+bin/saucal-hub.sh full-scan      --all              # all sites registered in the hub
+
+# example
+bin/saucal-hub.sh full-scan /var/www/talkboxmom/ngrok
+```
+
+`<container-path>` is the path **inside** the `nodephp` container (under `/var/www`).
+
+### Raw wp-cli (equivalent)
+
+```bash
+docker compose exec nodephp wp --path=/var/www/talkboxmom/ngrok \
+  --require=/var/www/hubmanager/public/wp-content/plugins/saucal-hub/cli-bootstrap.php \
+  saucal-hub full-scan --report
+```
+
+| Subcommand | What it does | Key flags |
+|------------|--------------|-----------|
+| `wp saucal-hub full-scan` | Cron forensics **+** safety scan **+** store report (one pass) | `--report` (implied), `--replay`, `--format=json` |
+| `wp saucal-hub scan` | Safety scan only | `--report`, `--format=json` |
+| `wp saucal-hub cron-forensics` | Detect a plugin thrashing the WP-Cron option (two-pass) | `--report`, `--replay` (clone-only), `--iterations=<n>`, `--force`, `--format=json` |
+| `wp saucal-hub make-safe` | Apply every applicable, unsafe fix (guarded) | `--report`, `--format=json` |
+| `wp saucal-hub fix <check>` | Apply one check's fix | `--report` |
+
+When the plugin **is** active on a site you can drop the `--require=…` and just run
+`wp saucal-hub <subcommand>`.
 
 ## Architecture
 
@@ -144,16 +190,18 @@ includes/
   Main.php                  Plugin lifecycle; wires REST + EmailGuard + admin
   Admin/Page.php            Top-level menu + scoped React asset enqueue
   Rest/Controller.php       REST API (saucal-hub/v1): sites, discover, scan, fix, email-guard, subscriptions
-  CLI.php                   wp saucal-hub scan|make-safe|fix
+  CLI.php                   wp saucal-hub full-scan|scan|make-safe|fix|cron-forensics
   Safety/
     Engine.php              Check registry + scan/fix through a Source (local or remote)
     Check.php               Abstract base check (reads/writes via $this->src())
     ProductionGuard.php     Refuses fixes on non-clone hosts (evaluates the target host)
     EmailGuard.php          Runtime wp_mail allow-list
+    Logger.php              Activity log + WC_Logger mirror
+    CronWatch.php           WP-Cron option-thrash monitor + forensic probe
     Source/Source.php       Data-source interface
     Source/LocalSource.php  In-context WP functions
     Source/RemoteSource.php Cross-DB + wp-config parse (other local sites)
-    Checks/*.php            The individual checks
+    Checks/*.php            The individual checks (incl. CronOptionThrash)
   Sites/Registry.php        Site registry (options)
   Sites/Inspector.php       Auto-discovery + cross-DB report read-back
 cli-bootstrap.php           Loads the engine into any site's wp-cli (--require)

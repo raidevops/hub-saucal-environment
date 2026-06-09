@@ -20,6 +20,7 @@ import { InputSwitch } from 'primereact/inputswitch';
 import { Dropdown } from 'primereact/dropdown';
 import { Toast } from 'primereact/toast';
 import { ProgressSpinner } from 'primereact/progressspinner';
+import { ProgressBar } from 'primereact/progressbar';
 import { Message } from 'primereact/message';
 import { Panel } from 'primereact/panel';
 import { Divider } from 'primereact/divider';
@@ -405,7 +406,7 @@ function CommandBlock( { commands, toast } ) {
 			<p className="sh-muted">
 				{ __( 'Run from the docker-env root to scan / make this site safe (results appear here after refresh):', 'saucal-hub' ) }
 			</p>
-			{ [ [ 'scan', commands.scan ], [ 'make_safe', commands.make_safe ] ].map( ( [ key, cmd ] ) =>
+			{ [ [ 'full_scan', commands.full_scan ], [ 'scan', commands.scan ], [ 'make_safe', commands.make_safe ] ].map( ( [ key, cmd ] ) =>
 				cmd ? (
 					<div className="sh-inline" key={ key }>
 						<code className="sh-cmd">{ cmd }</code>
@@ -415,7 +416,7 @@ function CommandBlock( { commands, toast } ) {
 			) }
 			<p className="sh-muted">
 				{ __( 'Or simply: ', 'saucal-hub' ) }
-				<code className="sh-cmd">bin/saucal-hub.sh scan --all</code>
+				<code className="sh-cmd">bin/saucal-hub.sh full-scan --all</code>
 			</p>
 		</div>
 	);
@@ -670,6 +671,22 @@ function App() {
 					<Button label={ __( 'Add site', 'saucal-hub' ) } icon="pi pi-plus" outlined onClick={ () => setShowAdd( true ) } />
 				</div>
 			</header>
+
+			{ ( scanning || fixingAll || fixing ) && (
+				<div className="sh-progress">
+					<ProgressBar
+						mode="indeterminate"
+						style={ { height: '6px' } }
+					/>
+					<span className="sh-muted">
+						{ fixingAll
+							? __( 'Applying fixes…', 'saucal-hub' )
+							: fixing
+								? __( 'Applying fix…', 'saucal-hub' )
+								: __( 'Scanning — running checks & forensics…', 'saucal-hub' ) }
+					</span>
+				</div>
+			) }
 
 			{ selectedSite && (
 				<div className="sh-site-meta">

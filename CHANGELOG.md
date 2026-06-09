@@ -33,8 +33,14 @@ semantic versioning.
   is excluded; only callers that rewrite the cron row on *every* request are
   reported. `--report` writes an authoritative snapshot, so once the offending code
   is fixed a re-run flips the check back to SAFE immediately (no 24h wait).
+- **`wp saucal-hub full-scan`** — one synchronous in-context run = cron forensics +
+  the full safety scan + `--report`. Nothing deferred to WP-Cron/Action Scheduler.
+- **Orchestrator** `bin/saucal-hub.sh` gains `full-scan` and `cron-forensics`
+  actions (per path or `--all`), and `full-scan` is surfaced in the remote-site panel.
 
 ### Changed — Admin UX
+- PrimeReact **progress bar** shown while a scan/fix runs ("running checks &
+  forensics…").
 - The selected site is now reflected in the URL (`?page=saucal-hub&site=<id>`),
   so site views are bookmarkable and browser back/forward switches sites.
 

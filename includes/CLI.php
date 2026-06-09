@@ -48,9 +48,50 @@ final class CLI {
 			return;
 		}
 		\WP_CLI::add_command( 'saucal-hub scan', array( self::class, 'scan' ) );
+		\WP_CLI::add_command( 'saucal-hub full-scan', array( self::class, 'full_scan' ) );
 		\WP_CLI::add_command( 'saucal-hub make-safe', array( self::class, 'make_safe' ) );
 		\WP_CLI::add_command( 'saucal-hub fix', array( self::class, 'fix' ) );
 		\WP_CLI::add_command( 'saucal-hub cron-forensics', array( self::class, 'cron_forensics' ) );
+	}
+
+	/**
+	 * Full synchronous scan: active cron forensics (in-context) + the safety scan,
+	 * storing both so the hub reflects the live state immediately. Nothing is
+	 * deferred to WP-Cron / Action Scheduler — it all runs in this one process.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--report]
+	 * : Persist forensic findings and the safety report (default for full-scan).
+	 *
+	 * [--replay]
+	 * : Also actively re-fire per-request hooks during forensics (clone-only).
+	 *
+	 * [--format=<format>]
+	 * : "human" (default) or "json".
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp --path=/var/www/talkboxmom/ngrok \
+	 *      --require=/var/www/hubmanager/public/wp-content/plugins/saucal-hub/cli-bootstrap.php \
+	 *      saucal-hub full-scan
+	 *
+	 * @param array $args       Positional args.
+	 * @param array $assoc_args Flags.
+	 *
+	 * @return void
+	 */
+	public static function full_scan( $args, $assoc_args ): void {
+		// full-scan always persists, so the hub reads the fresh state.
+		$assoc_args['report'] = true;
+
+		\WP_CLI::log( '== Cron forensics ==' );
+		self::cron_forensics( $args, $assoc_args );
+
+		\WP_CLI::log( '== Safety scan ==' );
+		self::scan( $args, $assoc_args );
+
+		\WP_CLI::success( 'Full scan complete.' );
 	}
 
 	/**

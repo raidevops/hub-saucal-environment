@@ -243,3 +243,10 @@ code.sh-cmd {
 	font-size: 0.82rem;
 	margin-top: 0.4rem;
 }
+
+.sh-progress {
+	margin: 0.5rem 0 0.75rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}

@@ -205,6 +205,7 @@ final class Inspector {
 		);
 
 		return array(
+			'full_scan' => $base . ' full-scan',
 			'scan'      => $base . ' scan --report',
 			'make_safe' => $base . ' make-safe --report',
 		);
