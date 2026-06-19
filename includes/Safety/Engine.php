@@ -146,6 +146,7 @@ final class Engine {
 			'severity'    => $check->severity(),
 			'applicable'  => $check->is_applicable(),
 			'fixable'     => $check->is_fixable(),
+			'manual_commands' => $check->manual_commands(),
 		);
 	}
 

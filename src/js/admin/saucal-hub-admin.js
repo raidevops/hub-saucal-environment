@@ -107,7 +107,7 @@ const GROUP_LABELS = {
 /* -------------------------------------------------------------------------
  * Single check row
  * ---------------------------------------------------------------------- */
-function CheckRow( { check, busy, onFix, readOnly } ) {
+function CheckRow( { check, busy, onFix, readOnly, toast } ) {
 	const [ open, setOpen ] = useState( false );
 	const result = check.result || {};
 	const meta = statusMeta( result.status );
@@ -118,6 +118,14 @@ function CheckRow( { check, busy, onFix, readOnly } ) {
 		( result.status === 'unsafe' || result.status === 'warning' );
 	const details = result.details || {};
 	const hasDetails = details && Object.keys( details ).length > 0;
+	const manualCommands = check.manual_commands || [];
+
+	const copy = ( cmd ) => {
+		if ( navigator.clipboard ) {
+			navigator.clipboard.writeText( cmd );
+			toast?.current?.show( { severity: 'info', summary: __( 'Copied', 'saucal-hub' ), life: 1500 } );
+		}
+	};
 
 	return (
 		<div className="sh-check-row">
@@ -132,6 +140,24 @@ function CheckRow( { check, busy, onFix, readOnly } ) {
 				) }
 				{ check.description && (
 					<div className="sh-check-desc">{ check.description }</div>
+				) }
+				{ manualCommands.length > 0 && (
+					<div className="sh-manual-commands">
+						<span className="sh-manual-commands__title">
+							{ __( 'Run manually (turn on / off):', 'saucal-hub' ) }
+						</span>
+						{ manualCommands.map( ( mc ) => (
+							<div className="sh-manual-commands__row" key={ mc.command }>
+								<Tag
+									severity={ mc.state === 'safe' ? 'success' : 'danger' }
+									value={ mc.state === 'safe' ? __( 'Safe', 'saucal-hub' ) : __( 'Unsafe', 'saucal-hub' ) }
+								/>
+								<span className="sh-manual-commands__label">{ mc.label }</span>
+								<code className="sh-cmd">{ mc.command }</code>
+								<Button icon="pi pi-copy" size="small" text onClick={ () => copy( mc.command ) } />
+							</div>
+						) ) }
+					</div>
 				) }
 				{ hasDetails && (
 					<>
@@ -722,7 +748,7 @@ function App() {
 					{ Object.keys( groups ).map( ( g ) => (
 						<Card key={ g } title={ GROUP_LABELS[ g ] || g } className="sh-group">
 							{ groups[ g ].map( ( c ) => (
-								<CheckRow key={ c.id } check={ c } busy={ fixing } onFix={ fixOne } />
+								<CheckRow key={ c.id } check={ c } busy={ fixing } onFix={ fixOne } toast={ toast } />
 							) ) }
 						</Card>
 					) ) }

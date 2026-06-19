@@ -71,4 +71,19 @@ final class DisableCron extends Check {
 			array( 'remediation' => 'wp config set DISABLE_WP_CRON true --raw' )
 		);
 	}
+
+	public function manual_commands(): array {
+		return array(
+			array(
+				'state'   => self::STATUS_SAFE,
+				'label'   => __( 'Disable WP-Cron (safe — queued renewals will not fire)', 'saucal-hub' ),
+				'command' => 'wp config set DISABLE_WP_CRON true --raw',
+			),
+			array(
+				'state'   => self::STATUS_UNSAFE,
+				'label'   => __( 'Enable WP-Cron (unsafe — scheduled tasks fire automatically)', 'saucal-hub' ),
+				'command' => 'wp config delete DISABLE_WP_CRON',
+			),
+		);
+	}
 }

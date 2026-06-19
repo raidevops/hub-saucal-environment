@@ -131,4 +131,78 @@ final class PaymentGatewaysTestMode extends Check {
 			$changed
 		);
 	}
+
+	/**
+	 * Live (unsafe) values, mirroring gateways() test values inverted.
+	 *
+	 * @return array<string,array<string,string>>
+	 */
+	private function live_values(): array {
+		return array(
+			'woocommerce_woocommerce_payments_settings' => array( 'test_mode' => 'no' ),
+			'woocommerce_stripe_settings'               => array( 'testmode' => 'no' ),
+			'woocommerce_ppcp_settings'                 => array( 'environment' => 'live', 'sandbox' => 'no' ),
+			'woocommerce-ppcp-settings'                 => array( 'environment' => 'live', 'sandbox' => 'no' ),
+		);
+	}
+
+	/**
+	 * Human gateway name per settings option.
+	 *
+	 * @return array<string,string>
+	 */
+	private function gateway_names(): array {
+		return array(
+			'woocommerce_woocommerce_payments_settings' => 'WooPayments',
+			'woocommerce_stripe_settings'               => 'Stripe',
+			'woocommerce_ppcp_settings'                 => 'PayPal',
+			'woocommerce-ppcp-settings'                 => 'PayPal',
+		);
+	}
+
+	/**
+	 * Build a chained `wp option patch` command for a set of key/value pairs.
+	 *
+	 * @param string                $opt Settings option name.
+	 * @param array<string,string>  $kv  Key => value pairs to set.
+	 *
+	 * @return string
+	 */
+	private static function patch_command( string $opt, array $kv ): string {
+		$parts = array();
+		foreach ( $kv as $key => $value ) {
+			$parts[] = sprintf( 'wp option patch update %s %s %s', $opt, $key, $value );
+		}
+		return implode( ' && ', $parts );
+	}
+
+	public function manual_commands(): array {
+
+		$live     = $this->live_values();
+		$names    = $this->gateway_names();
+		$commands = array();
+
+		foreach ( $this->gateways() as $opt => $required ) {
+			// Only surface gateways that are actually present on this site.
+			if ( ! is_array( $this->src()->option( $opt ) ) ) {
+				continue;
+			}
+			$name = $names[ $opt ] ?? $opt;
+
+			$commands[] = array(
+				'state'   => self::STATUS_SAFE,
+				/* translators: %s: gateway name */
+				'label'   => sprintf( __( '%s → test/sandbox (safe)', 'saucal-hub' ), $name ),
+				'command' => self::patch_command( $opt, $required ),
+			);
+			$commands[] = array(
+				'state'   => self::STATUS_UNSAFE,
+				/* translators: %s: gateway name */
+				'label'   => sprintf( __( '%s → LIVE (unsafe — moves real money)', 'saucal-hub' ), $name ),
+				'command' => self::patch_command( $opt, $live[ $opt ] ?? array() ),
+			);
+		}
+
+		return $commands;
+	}
 }

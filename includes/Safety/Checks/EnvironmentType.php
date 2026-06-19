@@ -80,4 +80,19 @@ final class EnvironmentType extends Check {
 			)
 		);
 	}
+
+	public function manual_commands(): array {
+		return array(
+			array(
+				'state'   => self::STATUS_SAFE,
+				'label'   => __( 'Mark as staging (safe — payment plugins enter dev mode)', 'saucal-hub' ),
+				'command' => 'wp config set WP_ENVIRONMENT_TYPE staging',
+			),
+			array(
+				'state'   => self::STATUS_UNSAFE,
+				'label'   => __( 'Mark as production (unsafe — live charges enabled)', 'saucal-hub' ),
+				'command' => 'wp config set WP_ENVIRONMENT_TYPE production',
+			),
+		);
+	}
 }

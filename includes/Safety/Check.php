@@ -125,6 +125,21 @@ abstract class Check {
 	}
 
 	/**
+	 * Manual on/off commands an admin can run to toggle the underlying lever.
+	 *
+	 * Option- or constant-backed checks should override this so the UI can show
+	 * exactly how to turn the safety lever ON (safe) and OFF (unsafe) by hand.
+	 * Checks that scrub data (with no meaningful inverse) leave this empty.
+	 *
+	 * Each entry: array{ state:'safe'|'unsafe', label:string, command:string }.
+	 *
+	 * @return array<int,array{state:string,label:string,command:string}>
+	 */
+	public function manual_commands(): array {
+		return array();
+	}
+
+	/**
 	 * Inspect the site and return the current status.
 	 *
 	 * @return array{status:string,message:string,details:array}

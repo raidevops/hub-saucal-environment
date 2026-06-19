@@ -67,4 +67,19 @@ final class SubscriptionsAutomaticPayments extends Check {
 		$this->src()->update_option( self::OPTION, 'yes' );
 		return $this->ok( __( 'Disabled automatic subscription payments.', 'saucal-hub' ), array( 'value' => 'yes' ) );
 	}
+
+	public function manual_commands(): array {
+		return array(
+			array(
+				'state'   => self::STATUS_SAFE,
+				'label'   => __( 'Turn automatic payments OFF (safe — renewals become manual)', 'saucal-hub' ),
+				'command' => 'wp option update ' . self::OPTION . ' yes',
+			),
+			array(
+				'state'   => self::STATUS_UNSAFE,
+				'label'   => __( 'Turn automatic payments ON (unsafe — a clone can auto-charge real cards)', 'saucal-hub' ),
+				'command' => 'wp option update ' . self::OPTION . ' no',
+			),
+		);
+	}
 }

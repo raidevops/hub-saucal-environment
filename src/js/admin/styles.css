@@ -192,6 +192,34 @@ code.sh-cmd {
 	word-break: break-all;
 }
 
+.sh-manual-commands {
+	margin-top: 0.5rem;
+	padding: 0.5rem 0.6rem;
+	background: #f6f7f7;
+	border: 1px solid #e2e4e7;
+	border-radius: 4px;
+}
+
+.sh-manual-commands__title {
+	display: block;
+	font-weight: 600;
+	font-size: 0.8rem;
+	margin-bottom: 0.35rem;
+}
+
+.sh-manual-commands__row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 0.3rem 0;
+}
+
+.sh-manual-commands__label {
+	font-size: 0.8rem;
+	color: #50575e;
+}
+
 .sh-activity {
 	border: 1px solid #e2e4e7;
 	border-radius: 6px;
