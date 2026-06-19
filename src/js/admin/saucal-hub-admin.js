@@ -109,6 +109,7 @@ const GROUP_LABELS = {
  * ---------------------------------------------------------------------- */
 function CheckRow( { check, busy, onFix, readOnly, toast } ) {
 	const [ open, setOpen ] = useState( false );
+	const [ cmdOpen, setCmdOpen ] = useState( false );
 	const result = check.result || {};
 	const meta = statusMeta( result.status );
 	const canFix =
@@ -142,22 +143,39 @@ function CheckRow( { check, busy, onFix, readOnly, toast } ) {
 					<div className="sh-check-desc">{ check.description }</div>
 				) }
 				{ manualCommands.length > 0 && (
-					<div className="sh-manual-commands">
-						<span className="sh-manual-commands__title">
-							{ __( 'Run manually (turn on / off):', 'saucal-hub' ) }
-						</span>
-						{ manualCommands.map( ( mc ) => (
-							<div className="sh-manual-commands__row" key={ mc.command }>
-								<Tag
-									severity={ mc.state === 'safe' ? 'success' : 'danger' }
-									value={ mc.state === 'safe' ? __( 'Safe', 'saucal-hub' ) : __( 'Unsafe', 'saucal-hub' ) }
-								/>
-								<span className="sh-manual-commands__label">{ mc.label }</span>
-								<code className="sh-cmd">{ mc.command }</code>
-								<Button icon="pi pi-copy" size="small" text onClick={ () => copy( mc.command ) } />
+					<>
+						<Button
+							label={ __( 'Run manually (turn on / off)', 'saucal-hub' ) }
+							icon="pi pi-code"
+							size="small"
+							text
+							className="sh-manual-trigger"
+							onClick={ () => setCmdOpen( true ) }
+						/>
+						<Dialog
+							header={ check.label }
+							visible={ cmdOpen }
+							style={ { width: '560px', maxWidth: '95vw' } }
+							onHide={ () => setCmdOpen( false ) }
+						>
+							<div className="sh-manual-commands">
+								<span className="sh-manual-commands__title">
+									{ __( 'Run manually (turn on / off):', 'saucal-hub' ) }
+								</span>
+								{ manualCommands.map( ( mc ) => (
+									<div className="sh-manual-commands__row" key={ mc.command }>
+										<Tag
+											severity={ mc.state === 'safe' ? 'success' : 'danger' }
+											value={ mc.state === 'safe' ? __( 'Safe', 'saucal-hub' ) : __( 'Unsafe', 'saucal-hub' ) }
+										/>
+										<span className="sh-manual-commands__label">{ mc.label }</span>
+										<code className="sh-cmd">{ mc.command }</code>
+										<Button icon="pi pi-copy" size="small" text onClick={ () => copy( mc.command ) } />
+									</div>
+								) ) }
 							</div>
-						) ) }
-					</div>
+						</Dialog>
+					</>
 				) }
 				{ hasDetails && (
 					<>
