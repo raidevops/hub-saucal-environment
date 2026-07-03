@@ -6,6 +6,23 @@ semantic versioning.
 
 ## [Unreleased]
 
+### Fixed — Payments safety
+- **`gateways_test_mode` now detects Payment Plugins for PayPal live mode.** The
+  check read `environment` from `woocommerce_ppcp_settings`, but the plugin stores
+  the live/sandbox toggle in a separate option, `woocommerce_ppcp_api_settings`
+  (values `sandbox` | `production`) — so a PayPal gateway running in **production**
+  on a clone was reported SAFE. It now reads/writes `woocommerce_ppcp_api_settings`,
+  correctly flags `environment=production` as UNSAFE, and the fix/manual commands
+  target the right option (`production` is the live value, not `live`). Dropped the
+  stale `woocommerce-ppcp-settings` / `sandbox=yes` mappings that never matched.
+- **`gateways_test_mode` now also flags & clears leftover live PayPal credentials.**
+  A clone left with `client_id_production` / `secret_key_production` /
+  `access_token_production` / `merchant_id_production` (etc.) in
+  `woocommerce_ppcp_api_settings` is one toggle away from charging real money, so
+  those are reported UNSAFE even when the environment is already `sandbox`. The fix
+  blanks every present production credential key (and a manual "PayPal → clear live
+  credentials" command is surfaced).
+
 ### Added — Performance / stability
 - **WP-Cron option thrash detection** (`Safety\CronWatch` + `cron_option_thrash`
   check): a runtime monitor attributes every write to the single `cron`

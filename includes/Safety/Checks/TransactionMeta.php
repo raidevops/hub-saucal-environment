@@ -21,6 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class TransactionMeta extends Check {
 
+	use TestDomainFilter;
+
 	/**
 	 * Meta keys to strip.
 	 *
@@ -85,19 +87,25 @@ final class TransactionMeta extends Check {
 		$in = "'" . implode( "','", array_map( 'esc_sql', $this->keys() ) ) . "'";
 
 		if ( $this->is_hpos() ) {
-			$meta = $this->src()->table( 'wc_orders_meta' );
+			$meta     = $this->src()->table( 'wc_orders_meta' );
+			$orders   = $this->src()->table( 'wc_orders' );
+			$not_test = $this->not_test_email_sql( 'o.billing_email' );
 			return $this->src()->get_results(
-				"SELECT order_id, meta_key, meta_value FROM {$meta}
-				 WHERE meta_key IN ({$in}) ORDER BY order_id DESC LIMIT " . self::SAMPLE_LIMIT
+				"SELECT m.order_id, m.meta_key, m.meta_value FROM {$meta} m
+				 JOIN {$orders} o ON o.id = m.order_id
+				 WHERE m.meta_key IN ({$in}) AND {$not_test}
+				 ORDER BY m.order_id DESC LIMIT " . self::SAMPLE_LIMIT
 			);
 		}
 
 		$postmeta = $this->src()->table( 'postmeta' );
 		$posts    = $this->src()->table( 'posts' );
+		$not_test = $this->not_test_email_sql( 'bm.meta_value' );
 		return $this->src()->get_results(
 			"SELECT p.ID AS order_id, p.post_type, pm.meta_key, pm.meta_value
 			 FROM {$postmeta} pm JOIN {$posts} p ON p.ID = pm.post_id
-			 WHERE p.post_type IN ('shop_order','shop_subscription') AND pm.meta_key IN ({$in})
+			 LEFT JOIN {$postmeta} bm ON bm.post_id = p.ID AND bm.meta_key = '_billing_email'
+			 WHERE p.post_type IN ('shop_order','shop_subscription') AND pm.meta_key IN ({$in}) AND {$not_test}
 			 ORDER BY p.ID DESC LIMIT " . self::SAMPLE_LIMIT
 		);
 	}
@@ -111,16 +119,24 @@ final class TransactionMeta extends Check {
 		$in = "'" . implode( "','", array_map( 'esc_sql', $this->keys() ) ) . "'";
 
 		if ( $this->is_hpos() ) {
-			$meta = $this->src()->table( 'wc_orders_meta' );
-			return (int) $this->src()->get_var( "SELECT COUNT(*) FROM {$meta} WHERE meta_key IN ({$in})" );
+			$meta     = $this->src()->table( 'wc_orders_meta' );
+			$orders   = $this->src()->table( 'wc_orders' );
+			$not_test = $this->not_test_email_sql( 'o.billing_email' );
+			return (int) $this->src()->get_var(
+				"SELECT COUNT(*) FROM {$meta} m
+				 JOIN {$orders} o ON o.id = m.order_id
+				 WHERE m.meta_key IN ({$in}) AND {$not_test}"
+			);
 		}
 
 		$postmeta = $this->src()->table( 'postmeta' );
 		$posts    = $this->src()->table( 'posts' );
+		$not_test = $this->not_test_email_sql( 'bm.meta_value' );
 		return (int) $this->src()->get_var(
 			"SELECT COUNT(*) FROM {$postmeta} pm
 			 JOIN {$posts} p ON p.ID = pm.post_id
-			 WHERE p.post_type IN ('shop_order','shop_subscription') AND pm.meta_key IN ({$in})"
+			 LEFT JOIN {$postmeta} bm ON bm.post_id = p.ID AND bm.meta_key = '_billing_email'
+			 WHERE p.post_type IN ('shop_order','shop_subscription') AND pm.meta_key IN ({$in}) AND {$not_test}"
 		);
 	}
 
@@ -165,15 +181,23 @@ final class TransactionMeta extends Check {
 		$in = "'" . implode( "','", array_map( 'esc_sql', $this->keys() ) ) . "'";
 
 		if ( $this->is_hpos() ) {
-			$meta = $this->src()->table( 'wc_orders_meta' );
-			$this->src()->query( "DELETE FROM {$meta} WHERE meta_key IN ({$in})" );
+			$meta     = $this->src()->table( 'wc_orders_meta' );
+			$orders   = $this->src()->table( 'wc_orders' );
+			$not_test = $this->not_test_email_sql( 'o.billing_email' );
+			$this->src()->query(
+				"DELETE m FROM {$meta} m
+				 JOIN {$orders} o ON o.id = m.order_id
+				 WHERE m.meta_key IN ({$in}) AND {$not_test}"
+			);
 		} else {
 			$postmeta = $this->src()->table( 'postmeta' );
 			$posts    = $this->src()->table( 'posts' );
+			$not_test = $this->not_test_email_sql( 'bm.meta_value' );
 			$this->src()->query(
 				"DELETE pm FROM {$postmeta} pm
 				 JOIN {$posts} p ON p.ID = pm.post_id
-				 WHERE p.post_type IN ('shop_order','shop_subscription') AND pm.meta_key IN ({$in})"
+				 LEFT JOIN {$postmeta} bm ON bm.post_id = p.ID AND bm.meta_key = '_billing_email'
+				 WHERE p.post_type IN ('shop_order','shop_subscription') AND pm.meta_key IN ({$in}) AND {$not_test}"
 			);
 		}
 

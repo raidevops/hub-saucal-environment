@@ -23,6 +23,52 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class PaymentGatewaysTestMode extends Check {
 
 	/**
+	 * Option holding the Payment Plugins for PayPal API credentials + environment.
+	 */
+	const PPCP_API_OPT = 'woocommerce_ppcp_api_settings';
+
+	/**
+	 * Production-suffixed credential keys inside PPCP_API_OPT. Leftover live
+	 * credentials on a clone are unsafe even when the environment is sandbox — a
+	 * single toggle back to production would let it charge real money — so the
+	 * check flags them and the fix blanks them.
+	 *
+	 * @return array<int,string>
+	 */
+	private function ppcp_production_cred_keys(): array {
+		return array(
+			'client_id_production',
+			'secret_key_production',
+			'access_token_production',
+			'merchant_id_production',
+			'webhook_id_production',
+			'webhook_url_production',
+			'create_webhook_production',
+			'connect_production',
+			'connect_params_production',
+		);
+	}
+
+	/**
+	 * Production credential keys that are actually present (non-empty) on the site.
+	 *
+	 * @return array<int,string>
+	 */
+	private function ppcp_present_production_creds(): array {
+		$api = $this->src()->option( self::PPCP_API_OPT );
+		if ( ! is_array( $api ) ) {
+			return array();
+		}
+		$present = array();
+		foreach ( $this->ppcp_production_cred_keys() as $key ) {
+			if ( ! empty( $api[ $key ] ) ) {
+				$present[] = $key;
+			}
+		}
+		return $present;
+	}
+
+	/**
 	 * Map of gateway settings option => array of key => required test value.
 	 *
 	 * @return array<string,array<string,string>>
@@ -31,14 +77,10 @@ final class PaymentGatewaysTestMode extends Check {
 		return array(
 			'woocommerce_woocommerce_payments_settings' => array( 'test_mode' => 'yes' ),
 			'woocommerce_stripe_settings'               => array( 'testmode' => 'yes' ),
-			'woocommerce_ppcp_settings'                 => array(
-				'environment' => 'sandbox',
-				'sandbox'     => 'yes',
-			),
-			'woocommerce-ppcp-settings'                 => array(
-				'environment' => 'sandbox',
-				'sandbox'     => 'yes',
-			),
+			// Payment Plugins for PayPal (pymntpl-paypal-woocommerce) stores the
+			// live/sandbox toggle in its API settings option, NOT the gateway
+			// settings option. Values are 'sandbox' | 'production'.
+			'woocommerce_ppcp_api_settings'             => array( 'environment' => 'sandbox' ),
 		);
 	}
 
@@ -51,7 +93,7 @@ final class PaymentGatewaysTestMode extends Check {
 	}
 
 	public function description(): string {
-		return __( 'Forces WooPayments, Stripe and PayPal into test/sandbox so even a manual checkout cannot move real money.', 'saucal-hub' );
+		return __( 'Forces WooPayments, Stripe and PayPal into test/sandbox and clears leftover live PayPal credentials so even a manual checkout cannot move real money.', 'saucal-hub' );
 	}
 
 	public function group(): string {
@@ -92,17 +134,23 @@ final class PaymentGatewaysTestMode extends Check {
 			}
 		}
 
+		// Leftover live PayPal credentials are unsafe even in sandbox mode.
+		$leftover_creds = $this->ppcp_present_production_creds();
+		if ( ! empty( $leftover_creds ) ) {
+			$offenders[ self::PPCP_API_OPT ]['__production_credentials'] = $leftover_creds;
+		}
+
 		if ( empty( $offenders ) ) {
 			return $this->result(
 				self::STATUS_SAFE,
-				__( 'All present payment gateways are in test/sandbox mode.', 'saucal-hub' ),
+				__( 'All present payment gateways are in test/sandbox mode with no live PayPal credentials.', 'saucal-hub' ),
 				array( 'gateways' => $present )
 			);
 		}
 
 		return $this->result(
 			self::STATUS_UNSAFE,
-			__( 'One or more payment gateways are in LIVE mode.', 'saucal-hub' ),
+			__( 'One or more payment gateways are in LIVE mode or still hold live PayPal credentials.', 'saucal-hub' ),
 			array( 'offenders' => $offenders )
 		);
 	}
@@ -124,10 +172,27 @@ final class PaymentGatewaysTestMode extends Check {
 			}
 		}
 
+		// Blank leftover live PayPal credentials so the site can't be flipped
+		// back to charging real money.
+		$api = $this->src()->option( self::PPCP_API_OPT );
+		if ( is_array( $api ) ) {
+			$blanked = array();
+			foreach ( $this->ppcp_production_cred_keys() as $key ) {
+				if ( isset( $api[ $key ] ) && '' !== $api[ $key ] && array() !== $api[ $key ] ) {
+					$api[ $key ] = is_array( $api[ $key ] ) ? array() : '';
+					$blanked[]   = $key;
+				}
+			}
+			if ( ! empty( $blanked ) ) {
+				$this->src()->update_option( self::PPCP_API_OPT, $api );
+				$changed[ self::PPCP_API_OPT . ':credentials' ] = $blanked;
+			}
+		}
+
 		return $this->ok(
 			empty( $changed )
-				? __( 'Gateways already in test mode.', 'saucal-hub' )
-				: __( 'Forced payment gateways into test/sandbox mode.', 'saucal-hub' ),
+				? __( 'Gateways already in test mode with no live PayPal credentials.', 'saucal-hub' )
+				: __( 'Forced payment gateways into test/sandbox mode and cleared live PayPal credentials.', 'saucal-hub' ),
 			$changed
 		);
 	}
@@ -141,8 +206,7 @@ final class PaymentGatewaysTestMode extends Check {
 		return array(
 			'woocommerce_woocommerce_payments_settings' => array( 'test_mode' => 'no' ),
 			'woocommerce_stripe_settings'               => array( 'testmode' => 'no' ),
-			'woocommerce_ppcp_settings'                 => array( 'environment' => 'live', 'sandbox' => 'no' ),
-			'woocommerce-ppcp-settings'                 => array( 'environment' => 'live', 'sandbox' => 'no' ),
+			'woocommerce_ppcp_api_settings'             => array( 'environment' => 'production' ),
 		);
 	}
 
@@ -155,8 +219,7 @@ final class PaymentGatewaysTestMode extends Check {
 		return array(
 			'woocommerce_woocommerce_payments_settings' => 'WooPayments',
 			'woocommerce_stripe_settings'               => 'Stripe',
-			'woocommerce_ppcp_settings'                 => 'PayPal',
-			'woocommerce-ppcp-settings'                 => 'PayPal',
+			'woocommerce_ppcp_api_settings'             => 'PayPal',
 		);
 	}
 
@@ -200,6 +263,20 @@ final class PaymentGatewaysTestMode extends Check {
 				/* translators: %s: gateway name */
 				'label'   => sprintf( __( '%s → LIVE (unsafe — moves real money)', 'saucal-hub' ), $name ),
 				'command' => self::patch_command( $opt, $live[ $opt ] ?? array() ),
+			);
+		}
+
+		// Safe command to wipe leftover live PayPal credentials.
+		$leftover = $this->ppcp_present_production_creds();
+		if ( ! empty( $leftover ) ) {
+			$blank = array();
+			foreach ( $leftover as $key ) {
+				$blank[ $key ] = "''";
+			}
+			$commands[] = array(
+				'state'   => self::STATUS_SAFE,
+				'label'   => __( 'PayPal → clear live credentials (safe)', 'saucal-hub' ),
+				'command' => self::patch_command( self::PPCP_API_OPT, $blank ),
 			);
 		}
 

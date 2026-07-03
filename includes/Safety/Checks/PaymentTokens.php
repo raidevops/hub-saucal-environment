@@ -23,6 +23,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 final class PaymentTokens extends Check {
 
+	use TestDomainFilter;
+
 	public function id(): string {
 		return 'payment_tokens';
 	}
@@ -64,7 +66,38 @@ final class PaymentTokens extends Check {
 			return 0;
 		}
 		$table = $this->src()->table( 'woocommerce_payment_tokens' );
-		return (int) $this->src()->get_var( "SELECT COUNT(*) FROM {$table} WHERE token NOT LIKE 'dummy\\_%'" );
+		$users = $this->src()->table( 'users' );
+		$not_test = $this->not_test_email_sql( 'u.user_email' );
+		return (int) $this->src()->get_var(
+			"SELECT COUNT(*) FROM {$table} t
+			 LEFT JOIN {$users} u ON u.ID = t.user_id
+			 WHERE t.token NOT LIKE 'dummy\\_%' AND {$not_test}"
+		);
+	}
+
+	/**
+	 * All token ids the scan considers unsafe (non-dummy, not test-domain).
+	 * Used by fix() so it never touches discarded test-domain tokens.
+	 *
+	 * @return array<int>
+	 */
+	private function target_ids(): array {
+		if ( ! $this->has_table() ) {
+			return array();
+		}
+		$table    = $this->src()->table( 'woocommerce_payment_tokens' );
+		$users    = $this->src()->table( 'users' );
+		$not_test = $this->not_test_email_sql( 'u.user_email' );
+		$rows     = $this->src()->get_results(
+			"SELECT t.token_id FROM {$table} t
+			 LEFT JOIN {$users} u ON u.ID = t.user_id
+			 WHERE t.token NOT LIKE 'dummy\\_%' AND {$not_test}"
+		);
+		$ids = array();
+		foreach ( $rows as $row ) {
+			$ids[] = (int) $row['token_id'];
+		}
+		return $ids;
 	}
 
 	/**
@@ -76,10 +109,14 @@ final class PaymentTokens extends Check {
 		if ( ! $this->has_table() ) {
 			return array();
 		}
-		$table = $this->src()->table( 'woocommerce_payment_tokens' );
+		$table    = $this->src()->table( 'woocommerce_payment_tokens' );
+		$users    = $this->src()->table( 'users' );
+		$not_test = $this->not_test_email_sql( 'u.user_email' );
 		return $this->src()->get_results(
-			"SELECT token_id, gateway_id, type, user_id, token FROM {$table}
-			 WHERE token NOT LIKE 'dummy\\_%' ORDER BY token_id DESC LIMIT " . self::SAMPLE_LIMIT
+			"SELECT t.token_id, t.gateway_id, t.type, t.user_id, t.token FROM {$table} t
+			 LEFT JOIN {$users} u ON u.ID = t.user_id
+			 WHERE t.token NOT LIKE 'dummy\\_%' AND {$not_test}
+			 ORDER BY t.token_id DESC LIMIT " . self::SAMPLE_LIMIT
 		);
 	}
 
@@ -121,10 +158,16 @@ final class PaymentTokens extends Check {
 		$mode       = isset( $args['mode'] ) && 'delete' === $args['mode'] ? 'delete' : 'dummy';
 		$before     = $this->real_token_count();
 		$samples    = $this->samples(); // Capture the real token rows before neutralising.
+		$ids        = $this->target_ids(); // Scope to non-test tokens only.
+
+		if ( empty( $ids ) ) {
+			return $this->ok( __( 'No live saved payment tokens to neutralise.', 'saucal-hub' ), array( 'neutralised' => 0 ) );
+		}
+		$in = implode( ',', $ids );
 
 		if ( 'delete' === $mode ) {
-			$this->src()->query( "DELETE FROM {$meta_table}" );
-			$this->src()->query( "DELETE FROM {$table}" );
+			$this->src()->query( "DELETE FROM {$meta_table} WHERE payment_token_id IN ({$in})" );
+			$this->src()->query( "DELETE FROM {$table} WHERE token_id IN ({$in})" );
 
 			return $this->ok(
 				sprintf(
@@ -142,14 +185,14 @@ final class PaymentTokens extends Check {
 		}
 
 		// Dummy mode: pad token values and neutralise gateway-identifying meta.
-		$this->src()->query( "UPDATE {$table} SET token = CONCAT('dummy_', token_id) WHERE token NOT LIKE 'dummy\\_%'" );
+		$this->src()->query( "UPDATE {$table} SET token = CONCAT('dummy_', token_id) WHERE token_id IN ({$in})" );
 
 		// Replace common gateway id meta values with dummies (keep keys/structure).
 		$dummy_keys = array( 'customer_id', 'source_id', 'payment_method_id', 'wc_stripe_customer', 'token', 'wc_payment_method_id' );
 		foreach ( $dummy_keys as $key ) {
 			$this->src()->query(
 				$this->src()->prepare(
-					"UPDATE {$meta_table} SET meta_value = CONCAT('dummy_', meta_id) WHERE meta_key = %s",
+					"UPDATE {$meta_table} SET meta_value = CONCAT('dummy_', meta_id) WHERE meta_key = %s AND payment_token_id IN ({$in})",
 					$key
 				)
 			);
